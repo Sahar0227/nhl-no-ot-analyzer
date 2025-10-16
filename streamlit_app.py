@@ -4,9 +4,13 @@ from typing import Any, Dict, List
 import pandas as pd
 import streamlit as st
 
-from analyzer import compute_signals_for_matchup, score_matchup, should_skip
-from config import MAX_TOP_GAMES
-from data_fetcher import fetch_schedule, fetch_standings, fetch_teams
+try:
+    from analyzer import compute_signals_for_matchup, score_matchup, should_skip
+    from config import MAX_TOP_GAMES
+    from data_fetcher import fetch_schedule, fetch_standings, fetch_teams
+except ImportError as e:
+    st.error(f"Import error: {e}")
+    st.stop()
 
 
 st.set_page_config(page_title="NHL No OT Analyzer", layout="wide")
