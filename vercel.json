@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "maxDuration": 10,
+      "memory": 512,
+      "includeFiles": "api/**",
+      "excludeFiles": "{.venv,tests,*.md,*.txt,!api/requirements.txt,streamlit_app.py}"
+    }
+  }
+}
+
+
