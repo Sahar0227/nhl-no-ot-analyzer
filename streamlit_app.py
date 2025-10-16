@@ -2,6 +2,7 @@ import datetime as dt
 from typing import Any, Dict, List
 
 import pandas as pd
+import requests
 import streamlit as st
 
 try:
@@ -32,6 +33,25 @@ if 'retry_count' not in st.session_state:
     st.session_state.retry_count = 0
 
 def fetch_data():
+    api_base = st.secrets.get("API_BASE") if hasattr(st, "secrets") else None
+    if api_base:
+        # Use deployed API (real-time) to avoid Cloud DNS glitches
+        try:
+            params = {
+                "date": target_date.isoformat(),
+                "max_rows": int(max_rows),
+                "skip_flags": bool(skip_flags),
+            }
+            r = requests.get(f"{api_base}/api/games", params=params, timeout=20)
+            r.raise_for_status()
+            payload = r.json()
+            games = payload.get("games", [])
+            # Minimal mapping for display
+            teams_map = fetch_teams()  # still map IDs to abbreviations
+            return teams_map, None, games, None
+        except Exception as e:
+            return None, None, None, f"API_BASE request failed: {e}"
+    # Fallback: call NHL directly
     try:
         teams_map = fetch_teams()
         standings = fetch_standings()
@@ -54,12 +74,31 @@ if error:
     st.stop()
 
 rows: List[Dict[str, Any]] = []
-for g in schedule:
-    signals = compute_signals_for_matchup(g, standings)
-    if skip_flags and should_skip(signals):
-        continue
-    scored = score_matchup(signals)
-    rows.append(scored)
+if isinstance(schedule, list) and schedule and isinstance(schedule[0], dict) and "matchup" in schedule[0]:
+    # schedule is API payload already scored or raw; if our API returns scored fields, use them
+    # Our API returns compact payload without full scoring; compute confidence if missing
+    for item in schedule:
+        # When using API, item already represents a scored game from analyzer API
+        rows.append({
+            "away_id": item.get("away_id"),
+            "home_id": item.get("home_id"),
+            "confidence": item.get("confidence", 0),
+            "head2head_OT_rate": (item.get("head2head_ot_pct", 0) / 100.0) if isinstance(item.get("head2head_ot_pct"), (int, float)) else 0,
+            "evenly_matched": item.get("evenly_matched"),
+            "days_rest_away": (item.get("days_rest") or [None, None])[0],
+            "days_rest_home": (item.get("days_rest") or [None, None])[1],
+            "goalie_status_away": (item.get("goalie_status") or [None, None])[0],
+            "goalie_status_home": (item.get("goalie_status") or [None, None])[1],
+            "reason": item.get("reason", ""),
+            "data_confidence": item.get("data_confidence", 0),
+        })
+else:
+    for g in schedule or []:
+        signals = compute_signals_for_matchup(g, standings)
+        if skip_flags and should_skip(signals):
+            continue
+        scored = score_matchup(signals)
+        rows.append(scored)
 
 if not rows:
     st.info("No games found or all filtered out by current settings.")
