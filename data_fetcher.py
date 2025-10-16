@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import time
+import random
 
 from config import (
     NHL_API_BASE,
@@ -17,13 +19,23 @@ Session = requests.Session()
 Session.headers.update({
     "User-Agent": "nhl-no-ot-analyzer/1.0 (https://github.com)"
 })
-_retry = Retry(total=4, read=4, connect=4, backoff_factor=0.6, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET"])  # type: ignore[arg-type]
+# More aggressive retry for DNS/connection issues
+_retry = Retry(
+    total=6, 
+    read=3, 
+    connect=6, 
+    backoff_factor=1.0, 
+    status_forcelist=[429, 500, 502, 503, 504], 
+    allowed_methods=["GET"]
+)
 Session.mount("https://", HTTPAdapter(max_retries=_retry))
 Session.mount("http://", HTTPAdapter(max_retries=_retry))
 
 
 def _api_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    resp = Session.get(f"{NHL_API_BASE}{path}", params=params, timeout=15)
+    # Add jitter to prevent thundering herd
+    time.sleep(random.uniform(0.1, 0.5))
+    resp = Session.get(f"{NHL_API_BASE}{path}", params=params, timeout=20)
     resp.raise_for_status()
     return resp.json()
 

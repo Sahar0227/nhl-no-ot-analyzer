@@ -21,14 +21,33 @@ with col3:
     skip_flags = st.checkbox("Skip rivalry/evenly-matched games (view picks only)", value=False)
 
 error_box = st.empty()
-with st.spinner("Fetching data..."):
+retry_button = st.empty()
+
+# Check if this is a retry
+if 'retry_count' not in st.session_state:
+    st.session_state.retry_count = 0
+
+def fetch_data():
     try:
         teams_map = fetch_teams()
         standings = fetch_standings()
         schedule = fetch_schedule(target_date)
+        return teams_map, standings, schedule, None
     except Exception as e:
-        error_box.error("Network error contacting NHL API. Please retry in a minute or check your connection.")
-        st.stop()
+        return None, None, None, str(e)
+
+with st.spinner("Fetching live NHL data..."):
+    teams_map, standings, schedule, error = fetch_data()
+
+if error:
+    error_box.error(f"⚠️ **NHL API temporarily unavailable** (attempt {st.session_state.retry_count + 1})\n\nError: {error}\n\nThis is usually a temporary DNS issue. Click retry below.")
+    
+    if retry_button.button("🔄 Retry Now", type="primary"):
+        st.session_state.retry_count += 1
+        st.rerun()
+    
+    st.info("💡 **Tip**: NHL API issues are usually resolved within 1-2 minutes. Keep trying!")
+    st.stop()
 
 rows: List[Dict[str, Any]] = []
 for g in schedule:
