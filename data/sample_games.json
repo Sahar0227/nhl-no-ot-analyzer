@@ -1,0 +1,26 @@
+[
+  {
+    "away_id": 10,
+    "home_id": 15,
+    "head2head_OT_rate": 0.28,
+    "head2head_avg_goal_margin": 1.6,
+    "playoff_rivalry_flag": true,
+    "standings_gap": 4,
+    "regulation_win_pct_diff": 0.03,
+    "xg_share_diff": 0.05,
+    "evenly_matched": true,
+    "team_OT_rate_last_15_away": 0.18,
+    "team_OT_rate_last_15_home": 0.12,
+    "days_rest_away": 0,
+    "days_rest_home": 2,
+    "back_to_back_away": true,
+    "back_to_back_home": false,
+    "goalie_status_away": "unknown",
+    "goalie_status_home": "unknown",
+    "implied_total": 5.5,
+    "data_confidence": 80,
+    "reason": "Head-to-head OT 28% last 20, division rivals — higher OT risk"
+  }
+]
+
+
