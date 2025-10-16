@@ -35,9 +35,21 @@ Session.mount("http://", HTTPAdapter(max_retries=_retry))
 def _api_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     # Add jitter to prevent thundering herd
     time.sleep(random.uniform(0.1, 0.5))
-    resp = Session.get(f"{NHL_API_BASE}{path}", params=params, timeout=20)
-    resp.raise_for_status()
-    return resp.json()
+    url = f"{NHL_API_BASE}{path}"
+    try:
+        resp = Session.get(url, params=params, timeout=20)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        # Cloud DNS fallback: fetch via relay that returns raw body
+        # Example: https://r.jina.ai/http://statsapi.web.nhl.com/api/v1/teams
+        try:
+            relay = "https://r.jina.ai/http://" + url.replace("https://", "").replace("http://", "")
+            resp2 = Session.get(relay, params=params, timeout=20)
+            resp2.raise_for_status()
+            return resp2.json()  # r.jina.ai preserves JSON body
+        except Exception:
+            raise
 
 
 def fetch_teams(refresh: bool = False) -> Dict[int, Dict[str, Any]]:
