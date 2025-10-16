@@ -20,10 +20,15 @@ with col2:
 with col3:
     skip_flags = st.checkbox("Skip rivalry/evenly-matched games (view picks only)", value=False)
 
+error_box = st.empty()
 with st.spinner("Fetching data..."):
-    teams_map = fetch_teams()
-    standings = fetch_standings()
-    schedule = fetch_schedule(target_date)
+    try:
+        teams_map = fetch_teams()
+        standings = fetch_standings()
+        schedule = fetch_schedule(target_date)
+    except Exception as e:
+        error_box.error("Network error contacting NHL API. Please retry in a minute or check your connection.")
+        st.stop()
 
 rows: List[Dict[str, Any]] = []
 for g in schedule:

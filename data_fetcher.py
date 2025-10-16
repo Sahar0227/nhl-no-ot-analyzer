@@ -3,6 +3,8 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from config import (
     NHL_API_BASE,
@@ -15,10 +17,13 @@ Session = requests.Session()
 Session.headers.update({
     "User-Agent": "nhl-no-ot-analyzer/1.0 (https://github.com)"
 })
+_retry = Retry(total=4, read=4, connect=4, backoff_factor=0.6, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET"])  # type: ignore[arg-type]
+Session.mount("https://", HTTPAdapter(max_retries=_retry))
+Session.mount("http://", HTTPAdapter(max_retries=_retry))
 
 
 def _api_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    resp = Session.get(f"{NHL_API_BASE}{path}", params=params, timeout=20)
+    resp = Session.get(f"{NHL_API_BASE}{path}", params=params, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
@@ -34,22 +39,30 @@ def fetch_teams(refresh: bool = False) -> Dict[int, Dict[str, Any]]:
         if cached:
             return {int(k): v for k, v in cached.items()}
 
-    data = _api_get("/teams")
-    teams = {}
-    for t in data.get("teams", []):
-        teams[int(t["id"])]: Dict[str, Any]
-        teams[t["id"]] = {
-            "id": t["id"],
-            "name": t.get("name"),
-            "teamName": t.get("teamName"),
-            "shortName": t.get("shortName", t.get("teamName")),
-            "abbreviation": t.get("abbreviation"),
-            "venue": t.get("venue", {}),
-            "division": t.get("division", {}),
-            "conference": t.get("conference", {}),
-        }
-    write_cache(cache_key, {str(k): v for k, v in teams.items()})
-    return teams
+    try:
+        data = _api_get("/teams")
+        teams = {}
+        for t in data.get("teams", []):
+            teams[int(t["id"])]: Dict[str, Any]
+            teams[t["id"]] = {
+                "id": t["id"],
+                "name": t.get("name"),
+                "teamName": t.get("teamName"),
+                "shortName": t.get("shortName", t.get("teamName")),
+                "abbreviation": t.get("abbreviation"),
+                "venue": t.get("venue", {}),
+                "division": t.get("division", {}),
+                "conference": t.get("conference", {}),
+            }
+        write_cache(cache_key, {str(k): v for k, v in teams.items()})
+        return teams
+    except Exception:
+        # Graceful fallback: return cached teams if present
+        cached = read_cache(cache_key, 365 * 24 * 60 * 60)  # accept stale for UI
+        if cached:
+            return {int(k): v for k, v in cached.items()}
+        # As a last resort, return empty mapping; callers should handle
+        return {}
 
 
 def fetch_schedule(date: dt.date) -> List[Dict[str, Any]]:
