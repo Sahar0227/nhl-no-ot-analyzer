@@ -14,9 +14,20 @@ app = FastAPI(title="NHL No OT Analyzer API")
 @app.get("/api/games")
 def get_games(date: str | None = Query(default=None), max_rows: int = Query(default=MAX_TOP_GAMES), skip_flags: bool = Query(default=False)) -> Dict[str, Any]:
     target_date = dt.date.fromisoformat(date) if date else dt.date.today()
-    teams_map = fetch_teams()
-    standings = fetch_standings()
-    schedule = fetch_schedule(target_date)
+    
+    try:
+        teams_map = fetch_teams()
+        standings = fetch_standings()
+        schedule = fetch_schedule(target_date)
+    except Exception as e:
+        # Return cached/fallback data when NHL API is unreachable
+        return {
+            "date": target_date.isoformat(),
+            "count": 0,
+            "games": [],
+            "error": f"NHL API temporarily unavailable: {str(e)[:100]}",
+            "cached": True
+        }
 
     rows: List[Dict[str, Any]] = []
     for g in schedule:
